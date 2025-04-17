@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Wave Animation with Arduino Control</title>
+    <style>
+        body {
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #f0f0f0;
+        }
+        canvas {
+            border: 1px solid #ccc;
+        }
+        #connectButton {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        #status {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+        }
+    </style>
+</head>
+<body>
+    <button id="connectButton">Connect to Arduino</button>
+    <div id="status">Distance: -- cm</div>
+    <canvas id="waveCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('waveCanvas');
+        const ctx = canvas.getContext('2d');
+        const connectButton = document.getElementById('connectButton');
+        const statusDiv = document.getElementById('status');
+
+        // Set canvas size
+        canvas.width = 800;
+        canvas.height = 400;
+
+        // Wave parameters
+        let wavelength = 100;
+        let amplitude = 50;
+        let frequency = 0.02;
+        let phase = 0;
+        let lastDistance = 0;
+        let targetWavelength = wavelength;
+        let smoothingFactor = 0.1;
+
+        // Colors
+        const backgroundColor = '#00008B'; // Deep blue
+        const waveColor = '#FFFFFF';       // White
+
+        // Arduino connection
+        let port;
+        let reader;
+        let isConnected = false;
+
+        // Wave animation
+        function drawWave() {
+            // Clear canvas
+            ctx.fillStyle = backgroundColor;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Smooth wavelength transition
+            wavelength += (targetWavelength - wavelength) * smoothingFactor;
+
+            // Draw multiple waves
+            ctx.beginPath();
+            ctx.strokeStyle = waveColor;
+            ctx.lineWidth = 2;
+
+            for (let x = 0; x < canvas.width; x++) {
+                let y = canvas.height / 2;
+                
+                // Primary wave
+                y += amplitude * Math.sin((x * frequency) + phase);
+                
+                // Secondary waves based on distance
+                const distanceRatio = targetWavelength / 200; // normalized 0-1
+                
+                // Add smaller amplitude waves
+                y += amplitude * 0.3 * Math.sin((x * frequency * 2) + phase * 1.5) * distanceRatio;
+                y += amplitude * 0.15 * Math.sin((x * frequency * 3) + phase * 0.7) * (1 - distanceRatio);
+                
+                if (x === 0) {
+                    ctx.moveTo(x, y);
+                } else {
+                    ctx.lineTo(x, y);
+                }
+            }
+
+            ctx.stroke();
+            phase += 0.03; // Slightly slower animation
+            requestAnimationFrame(drawWave);
+        }
+
+        // Connect to Arduino
+        connectButton.addEventListener('click', async () => {
+            try {
+                port = await navigator.serial.requestPort();
+                await port.open({ baudRate: 9600 });
+                reader = port.readable.getReader();
+                isConnected = true;
+                connectButton.textContent = 'Connected';
+                connectButton.disabled = true;
+
+                // Read data from Arduino
+                while (isConnected) {
+                    const { value, done } = await reader.read();
+                    if (done) {
+                        break;
+                    }
+                    const distance = new TextDecoder().decode(value).trim();
+                    if (!isNaN(distance)) {
+                        statusDiv.textContent = `Distance: ${distance} cm`;
+                        // Update target wavelength based on distance with wider range
+                        targetWavelength = Math.max(40, Math.min(250, distance * 2));
+                        frequency = 2 * Math.PI / wavelength;
+                    }
+                }
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        });
+
+        // Start animation
+        drawWave();
+    </script>
+</body>
+</html> 
