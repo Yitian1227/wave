@@ -6,7 +6,7 @@ VCC 接到 5V
 GND 接到 GND  
 
 成果展示:
-
+https://youtu.be/XKuKpO_VIu4
 
 https://github.com/user-attachments/assets/2038c322-3828-4691-a6bd-2c294bdf3fc5
 
